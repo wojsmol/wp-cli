@@ -268,12 +268,12 @@ class WP_CLI {
 	 * @return int The command exit status
 	 */
 	static function launch( $command, $exit_on_error = true ) {
-		$r = proc_close( proc_open( $command, array( STDIN, STDOUT, STDERR ), $pipes ) );
+		passthru( $command, $err );
 
-		if ( $r && $exit_on_error )
-			exit($r);
+		if ( $err && $exit_on_error )
+			exit( $err );
 
-		return $r;
+		return $err;
 	}
 
 	static function get_config( $key = null ) {
