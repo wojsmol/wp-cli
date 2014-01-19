@@ -6,7 +6,7 @@ set -ex
 phpunit
 
 # Run the functional tests
-php behat.phar --format progress
+php behat.phar --format progress --multiline
 
 # Run CodeSniffer
 ./codesniffer/scripts/phpcs --standard=./ci/ php/
