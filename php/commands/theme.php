@@ -302,14 +302,10 @@ class Theme_Command extends \WP_CLI\CommandWithUpgrade {
 
 		foreach ( wp_get_themes() as $key => $theme ) {
 			$file = $theme->get_stylesheet_directory();
-			$update_info = $this->get_update_info( $theme->get_stylesheet() );
 
 			$items[ $file ] = array(
 				'name' => $key,
 				'status' => $this->get_status( $theme ),
-				'update' => (bool) $update_info,
-				'update_version' => $update_info['new_version'],
-				'update_package' => $update_info['package'],
 				'version' => $theme->get('Version'),
 				'update_id' => $theme->get_stylesheet(),
 			);

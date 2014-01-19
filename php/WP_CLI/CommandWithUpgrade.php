@@ -49,22 +49,26 @@ abstract class CommandWithUpgrade extends \WP_CLI_Command {
 			"%d installed {$this->item_type}s:",
 		$n ), $n ) );
 
-		$padding = $this->get_padding($items);
+		$padding = $this->get_padding( $items );
 
-		foreach ( $items as $file => $details ) {
-			if ( $details['update'] ) {
+		foreach ( $items as &$item ) {
+			$this->add_update_info( $item );
+
+			if ( $item['update'] ) {
 				$line = ' %yU%n';
 			} else {
 				$line = '  ';
 			}
 
-			$line .= $this->format_status( $details['status'], 'short' );
-			$line .= " " . str_pad( $details['name'], $padding ). "%n";
-			if ( !empty( $details['version'] ) ) {
-				$line .= " " . $details['version'];
+			$line .= $this->format_status( $item['status'], 'short' );
+			$line .= " " . str_pad( $item['name'], $padding ). "%n";
+			if ( !empty( $item['version'] ) ) {
+				$line .= " " . $item['version'];
 			}
 
 			\WP_CLI::line( \WP_CLI::colorize( $line ) );
+
+			unset( $item );
 		}
 
 		\WP_CLI::line();
@@ -196,9 +200,16 @@ abstract class CommandWithUpgrade extends \WP_CLI_Command {
 			$items = $this->filter_item_list( $items, $args );
 		}
 
-		$items_to_update = wp_list_filter( $items, array(
-			'update' => true
-		) );
+		$items_to_update = array();
+
+		foreach ( $items as $item ) {
+			$this->add_update_info( $item );
+
+			if ( !$item['update'] )
+				continue;
+
+			$items_to_update[] = $item;
+		}
 
 		if ( isset( $assoc_args['dry-run'] ) ) {
 			if ( empty( $items_to_update ) ) {
@@ -219,8 +230,9 @@ abstract class CommandWithUpgrade extends \WP_CLI_Command {
 		// Only attempt to update if there is something to update
 		if ( !empty( $items_to_update ) ) {
 			$cache_manager = \WP_CLI::get_http_cache_manager();
-			foreach ($items_to_update as $item) {
-				$cache_manager->whitelist_package($item['update_package'], $this->item_type, $item['name'], $item['update_version']);
+			foreach ( $items_to_update as $item ) {
+				$cache_manager->whitelist_package(
+					$item['update_package'], $this->item_type, $item['name'], $item['update_version'] );
 			}
 			$upgrader = $this->get_upgrader( $assoc_args );
 			$result = $upgrader->bulk_upgrade( wp_list_pluck( $items_to_update, 'update_id' ) );
@@ -250,6 +262,7 @@ abstract class CommandWithUpgrade extends \WP_CLI_Command {
 			\WP_CLI::error( "No {$this->item_type}s found." );
 
 		foreach ( $all_items as $key => &$item ) {
+			$this->add_update_info( $item );
 
 			if ( empty( $item['version'] ) )
 				$item['version'] = '';
@@ -293,13 +306,22 @@ abstract class CommandWithUpgrade extends \WP_CLI_Command {
 	 *
 	 * @return array|null
 	 */
-	protected function get_update_info( $slug ) {
+	protected function add_update_info( &$item ) {
+		$item['update'] = false;
+
+		if ( !isset( $item['update_id'] ) )
+			return;
+		$slug = $item['update_id'];
+
 		$update_list = get_site_transient( $this->upgrade_transient );
 
 		if ( !isset( $update_list->response[ $slug ] ) )
-			return null;
+			return;
+		$update_info = $update_list->response[ $slug ];
 
-		return (array) $update_list->response[ $slug ];
+		$item['update'] = true;
+		$item['update_version'] = $update_info->new_version;
+		$item['update_package'] = $update_info->package;
 	}
 
 	private $map = array(

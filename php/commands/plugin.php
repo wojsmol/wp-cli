@@ -116,7 +116,6 @@ class Plugin_Command extends \WP_CLI\CommandWithUpgrade {
 			$items[ $file ] = array(
 				'name' => $plugin->get_name(),
 				'status' => 'must-use',
-				'update' => false
 			);
 		}
 
@@ -300,16 +299,11 @@ class Plugin_Command extends \WP_CLI\CommandWithUpgrade {
 		$items = array();
 
 		foreach ( $this->get_plugins() as $plugin ) {
-			$update_info = $this->get_update_info( $plugin->file );
-
 			$details = $plugin->get_details();
 
 			$items[ $plugin->file ] = array(
 				'name' => $plugin->get_name(),
 				'status' => $plugin->get_status(),
-				'update' => (bool) $update_info,
-				'update_version' => $update_info['new_version'],
-				'update_package' => $update_info['package'],
 				'version' => $details['Version'],
 				'update_id' => $plugin->file,
 			);
