@@ -90,20 +90,16 @@ class Plugin_Command extends \WP_CLI\CommandWithUpgrade {
 
 	protected function status_single( $args ) {
 		$plugin = $this->fetcher->get_check( $args[0] );
-		$file = $plugin->file;
 
-		$details = $this->get_details( $file );
-
-		$status = $this->format_status( $this->get_status( $file ), 'long' );
+		$details = $plugin->get_details();
 
 		$version = $details['Version'];
-
-		if ( $this->has_update( $file ) )
+		if ( $this->has_update( $plugin->file ) )
 			$version .= ' (%gUpdate available%n)';
 
 		echo WP_CLI::colorize( \WP_CLI\Utils\mustache_render( 'plugin-status.mustache', array(
-			'slug' => $this->get_name( $file ),
-			'status' => $status,
+			'slug' => $plugin->get_name(),
+			'status' => $this->format_status( $plugin->get_status(), 'long' ),
 			'version' => $version,
 			'name' => $details['Name'],
 			'author' => $details['Author'],
@@ -115,8 +111,10 @@ class Plugin_Command extends \WP_CLI\CommandWithUpgrade {
 		$items = $this->get_item_list();
 
 		foreach ( get_mu_plugins() as $file => $mu_plugin ) {
+			$plugin = new \WP_CLI\Plugin( $file );
+
 			$items[ $file ] = array(
-				'name' => $this->get_name( $file ),
+				'name' => $plugin->get_name(),
 				'status' => 'must-use',
 				'update' => false
 			);
@@ -142,7 +140,7 @@ class Plugin_Command extends \WP_CLI\CommandWithUpgrade {
 		foreach ( $this->fetcher->get_many( $args ) as $plugin ) {
 			activate_plugin( $plugin->file, '', $network_wide );
 
-			$this->active_output( $plugin->name, $plugin->file, $network_wide, "activate" );
+			$this->active_output( $plugin, $network_wide, "activate" );
 		}
 	}
 
@@ -165,21 +163,19 @@ class Plugin_Command extends \WP_CLI\CommandWithUpgrade {
 		$disable_all = isset( $assoc_args['all'] );
 
 		if ( $disable_all ) {
-			foreach ( get_plugins() as $file => $details ) {
-				if ( $this->get_status( $file ) == "inactive" )
+			foreach ( $this->get_plugins() as $plugin ) {
+				if ( $plugin->get_status() == "inactive" )
 					continue;
 
-				$name = $this->get_name( $file );
+				deactivate_plugins( $plugin->file, false, $network_wide );
 
-				deactivate_plugins( $file, false, $network_wide );
-
-				$this->active_output( $name, $file, $network_wide, "deactivate" );
+				$this->active_output( $plugin, $network_wide, "deactivate" );
 			}
 		} else {
 			foreach ( $this->fetcher->get_many( $args ) as $plugin ) {
 				deactivate_plugins( $plugin->file, false, $network_wide );
 
-				$this->active_output( $plugin->name, $plugin->file, $network_wide, "deactivate" );
+				$this->active_output( $plugin, $network_wide, "deactivate" );
 			}
 		}
 	}
@@ -199,7 +195,7 @@ class Plugin_Command extends \WP_CLI\CommandWithUpgrade {
 		$network_wide = isset( $assoc_args['network'] );
 
 		foreach ( $this->fetcher->get_many( $args ) as $plugin ) {
-			if ( $this->check_active( $plugin->file, $network_wide ) ) {
+			if ( $this->check_active( $plugin, $network_wide ) ) {
 				$this->deactivate( array( $plugin->name ), $assoc_args );
 			} else {
 				$this->activate( array( $plugin->name ), $assoc_args );
@@ -303,21 +299,34 @@ class Plugin_Command extends \WP_CLI\CommandWithUpgrade {
 	protected function get_item_list() {
 		$items = array();
 
-		foreach ( get_plugins() as $file => $details ) {
-			$update_info = $this->get_update_info( $file );
+		foreach ( $this->get_plugins() as $plugin ) {
+			$update_info = $this->get_update_info( $plugin->file );
 
-			$items[ $file ] = array(
-				'name' => $this->get_name( $file ),
-				'status' => $this->get_status( $file ),
+			$details = $plugin->get_details();
+
+			$items[ $plugin->file ] = array(
+				'name' => $plugin->get_name(),
+				'status' => $plugin->get_status(),
 				'update' => (bool) $update_info,
 				'update_version' => $update_info['new_version'],
 				'update_package' => $update_info['package'],
 				'version' => $details['Version'],
-				'update_id' => $file,
+				'update_id' => $plugin->file,
 			);
 		}
 
 		return $items;
+	}
+
+	protected function get_plugins() {
+		$plugins = array();
+		foreach ( get_plugins() as $file => $details ) {
+			$plugin = new \WP_CLI\Plugin( $file );
+			$plugin->details = $details;
+			$plugins[] = $plugin;
+		}
+
+		return $plugins;
 	}
 
 	protected function filter_item_list( $items, $args ) {
@@ -384,15 +393,15 @@ class Plugin_Command extends \WP_CLI\CommandWithUpgrade {
 		$plugin = $this->fetcher->get_check( $args[0] );
 		$file = $plugin->file;
 
-		$plugin_data = get_plugin_data( WP_PLUGIN_DIR . '/' . $file, false, false );
+		$plugin_data = $plugin->get_details();
 
-		$plugin_obj = (object)array(
-			'name'        => $this->get_name( $file ),
+		$plugin_obj = (object) array(
+			'name'        => $plugin->get_name(),
 			'title'       => $plugin_data['Name'],
 			'author'      => $plugin_data['Author'],
 			'version'     => $plugin_data['Version'],
 			'description' => wordwrap( $plugin_data['Description'] ),
-			'status'      => $this->get_status( $file ),
+			'status'      => $plugin->get_status(),
 		);
 
 		$formatter = $this->get_formatter( $assoc_args );
@@ -501,16 +510,17 @@ class Plugin_Command extends \WP_CLI\CommandWithUpgrade {
 
 	/* PRIVATES */
 
-	private function check_active( $file, $network_wide ) {
+	private function check_active( $plugin, $network_wide ) {
 		$required = $network_wide ? 'active-network' : 'active';
 
-		return $required == $this->get_status( $file );
+		return $required == $plugin->get_status();
 	}
 
-	private function active_output( $name, $file, $network_wide, $action ) {
-		$network_wide = $network_wide || is_network_only_plugin( $file );
+	private function active_output( $plugin, $network_wide, $action ) {
+		$network_wide = $network_wide || is_network_only_plugin( $plugin->file );
+		$name = $plugin->get_name();
 
-		$check = $this->check_active( $file, $network_wide );
+		$check = $this->check_active( $plugin, $network_wide );
 
 		if ( ( $action == "activate" ) ? $check : ! $check ) {
 			if ( $network_wide )
@@ -520,41 +530,6 @@ class Plugin_Command extends \WP_CLI\CommandWithUpgrade {
 		} else {
 			WP_CLI::warning( "Could not {$action} the '{$name}' plugin." );
 		}
-	}
-
-	protected function get_status( $file ) {
-		if ( is_plugin_active_for_network( $file ) )
-			return 'active-network';
-
-		if ( is_plugin_active( $file ) )
-			return 'active';
-
-		return 'inactive';
-	}
-
-	/**
-	 * Get the details of a plugin.
-	 *
-	 * @param object
-	 * @return array
-	 */
-	private function get_details( $file ) {
-		$plugin_folder = get_plugins(  '/' . plugin_basename( dirname( $file ) ) );
-		$plugin_file = basename( $file );
-
-		return $plugin_folder[$plugin_file];
-	}
-
-	/**
-	 * Converts a plugin basename back into a friendly slug.
-	 */
-	private function get_name( $file ) {
-		if ( false === strpos( $file, '/' ) )
-			$name = basename( $file, '.php' );
-		else
-			$name = dirname( $file );
-
-		return $name;
 	}
 
 	private function _delete( $plugin ) {

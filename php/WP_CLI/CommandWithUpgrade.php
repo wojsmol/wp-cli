@@ -23,8 +23,6 @@ abstract class CommandWithUpgrade extends \WP_CLI_Command {
 
 	abstract protected function get_all_items();
 
-	abstract protected function get_status( $file );
-
 	abstract protected function status_single( $args );
 
 	abstract protected function install_from_repo( $slug, $assoc_args );

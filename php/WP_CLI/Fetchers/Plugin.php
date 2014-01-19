@@ -16,10 +16,9 @@ class Plugin extends Base {
 
 			// ignore files inside a plugin's subdirectory (like WP does)
 			if ( dirname( $file ) == '.' ) {
-				return (object) array(
-					'name' => $name,
-					'file' => $name . '/' . $file
-				);
+				$plugin = new \WP_CLI\Plugin( $name . '/' . $file );
+				$plugin->name = $name;
+				return $plugin;
 			}
 		}
 
@@ -29,7 +28,9 @@ class Plugin extends Base {
 		$plugins = get_plugins();
 
 		if ( isset( $plugins[ $file ] ) ) {
-			return (object) compact( 'name', 'file' );
+			$plugin = new \WP_CLI\Plugin( $file );
+			$plugin->name = $name;
+			return $plugin;
 		}
 
 		return false;
