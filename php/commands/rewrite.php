@@ -35,9 +35,6 @@ class Rewrite_Command extends WP_CLI_Command {
 	 * [--tag-base=<base>]
 	 * : Set the base for tag permalinks, i.e. '/tag/'.
 	 *
-	 * [--hard]
-	 * : Perform a hard flush - update `.htaccess` rules as well as rewrite rules in database.
-	 *
 	 * ## EXAMPLES
 	 *
 	 *     wp rewrite structure '/%year%/%monthnum%/%postname%'
@@ -83,17 +80,7 @@ class Rewrite_Command extends WP_CLI_Command {
 			$wp_rewrite->set_tag_base( $tag_base );
 		}
 
-		// make sure we detect mod_rewrite if configured in apache_modules in config
-		self::apache_modules();
-
-		// Launch a new process to flush rewrites because core expects flush
-		// to happen after rewrites are set
-		$new_assoc_args = array();
-		if ( isset( $assoc_args['hard'] ) )
-			$new_assoc_args['hard'] = true;
-		\WP_CLI::launch_self( 'rewrite flush', array(), $new_assoc_args );
-
-		WP_CLI::success( "Rewrite structure set." );
+		WP_CLI::success( "Rewrite structure set. Don't forget to call `wp rewrite flush`" );
 	}
 
 	/**
