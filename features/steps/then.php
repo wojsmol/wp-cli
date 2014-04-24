@@ -120,8 +120,8 @@ $steps->Then( '/^(STDOUT|STDERR) should not be empty$/',
 	}
 );
 
-$steps->Then( '/^the (.+) file should (exist|not exist|be:|contain:|not contain:)$/',
-	function ( $world, $path, $action, $expected = null ) {
+$steps->Then( '/^the (.+) (file|directory) should (exist|not exist|be:|contain:|not contain:)$/',
+	function ( $world, $path, $type, $action, $expected = null ) {
 		$path = $world->replace_variables( $path );
 
 		// If it's a relative path, make it relative to the current test dir
@@ -130,17 +130,23 @@ $steps->Then( '/^the (.+) file should (exist|not exist|be:|contain:|not contain:
 
 		switch ( $action ) {
 		case 'exist':
-			if ( !file_exists( $path ) ) {
+			if ( 'file' == $type && !file_exists( $path ) ) {
+				throw new Exception( $world->result );
+			} else if ( 'directory' == $type && ! is_dir( $path ) ) {
 				throw new Exception( $world->result );
 			}
 			break;
 		case 'not exist':
 			if ( file_exists( $path ) ) {
 				throw new Exception( $world->result );
+			} else if ( 'directory' == $type && is_dir( $path ) ) {
+				throw new Exception( $world->result );
 			}
 			break;
 		default:
-			if ( !file_exists( $path ) ) {
+			if ( 'directory' == $type ) {
+				throw new Exception( "$type doesn't support this action." );
+			} else if ( !file_exists( $path ) ) {
 				throw new Exception( "$path doesn't exist." );
 			}
 			$action = substr( $action, 0, -1 );
