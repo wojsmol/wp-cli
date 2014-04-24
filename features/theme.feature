@@ -178,3 +178,18 @@ Feature: Manage WordPress themes
       """
       Error: This is not a multisite install.
       """
+
+  Scenario: Upgrade a theme installed in a custom wp-content dir
+    Given a WP install
+    And a custom wp-content directory
+    And a my-content/mu-plugins/theme-directory.php file:
+      """
+      <?php
+      register_theme_directory( ABSPATH . 'wp-content/themes' );
+      """
+
+    When I run `wp theme install p2 --version=1.4.2 --force`
+    Then STDOUT should not be empty
+
+    When I run `wp theme update p2`
+    Then the wp-content/themes/p2/ directory should not exist

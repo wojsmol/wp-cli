@@ -155,3 +155,13 @@ Feature: Manage WordPress plugins
     Then STDOUT should be a table containing rows:
       | name       | status   |
       | akismet    | active   |
+
+  Scenario: Upgrade a plugin installed in a custom wp-content dir
+    Given a WP install
+    And a custom wp-content directory
+
+    When I run `wp plugin install akismet --version=2.5.7 --force`
+    Then STDOUT should not be empty
+
+    When I run `wp plugin update akismet`
+    Then the wp-content/plugins/akismet/ directory should not exist
