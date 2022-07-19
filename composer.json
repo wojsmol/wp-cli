@@ -31,7 +31,8 @@
     "config": {
         "allow-plugins": {
             "dealerdirect/phpcodesniffer-composer-installer": true,
-            "johnpbloch/wordpress-core-installer": true
+            "johnpbloch/wordpress-core-installer": true,
+            "johnpbloch/wordpress-core": true
         },
         "process-timeout": 7200,
         "sort-packages": true
